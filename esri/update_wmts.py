@@ -2,7 +2,7 @@ import json
 import urllib.request
 import xml.etree.ElementTree as ET
 
-# Header penyamaran agar tidak ditolak oleh server Esri (403 Forbidden)
+# Header penyamaran User-Agent
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
 print("Mengambil data waybackconfig.json terbaru...")
@@ -17,9 +17,11 @@ req_cap = urllib.request.Request(capabilities_url, headers=headers)
 with urllib.request.urlopen(req_cap) as response:
     xml_content = response.read()
 
+# Registrasi Namespace Baku OGC (Mencegah timbulnya ns0: pada root)
 ET.register_namespace('', 'http://www.opengis.net/wmts/1.0.0')
 ET.register_namespace('ows', 'http://www.opengis.net/ows/1.1')
 ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
+ET.register_namespace('xsi', 'http://www.w3.org/2001/XMLSchema-instance')
 
 root = ET.fromstring(xml_content)
 ns = {
@@ -29,9 +31,11 @@ ns = {
 
 contents = root.find('wmts:Contents', ns)
 if contents is not None:
+    # Hapus semua layer lama dari template
     for layer in contents.findall('wmts:Layer', ns):
         contents.remove(layer)
 
+    # Susun ulang layer berdasarkan waybackconfig.json
     for release_id, details in config_data.items():
         title = details.get('itemTitle', f'World Imagery (Wayback {release_id})')
         identifier = details.get('layerIdentifier', f'WB_{release_id}')
