@@ -21,7 +21,7 @@ with urllib.request.urlopen(req_cap) as response:
 parser = etree.XMLParser(remove_blank_text=True)
 root = etree.fromstring(xml_content, parser)
 
-# Pemetaan namespace resmi
+# Pemetaan namespace resmi OGC
 ns = {
     'wmts': 'http://www.opengis.net/wmts/1.0.0',
     'ows': 'http://www.opengis.net/ows/1.1'
@@ -33,10 +33,21 @@ if contents is not None:
     for layer in contents.findall('wmts:Layer', ns):
         contents.remove(layer)
 
-    # Tambahkan layer baru berdasarkan waybackconfig.json
-    for release_id, details in config_data.items():
-        title = details.get('itemTitle', f'World Imagery (Wayback {release_id})')
-        identifier = details.get('layerIdentifier', f'WB_{release_id}')
+    # Susun ulang layer berdasarkan config Esri
+    for release_key, details in config_data.items():
+        title = details.get('itemTitle', f'World Imagery (Wayback {release_key})')
+        identifier = details.get('layerIdentifier', f'WB_{release_key}')
+        
+        # Mengambil itemURL resmi Esri jika ada, atau buat URL berbasis releaseNum
+        item_url = details.get('itemURL', '')
+        if item_url:
+            # Konversi template variabel Esri ({level}/{row}/{col}) ke variabel resmi WMTS OGC
+            template_url = item_url.replace('{level}', '{TileMatrix}').replace('{row}', '{TileRow}').replace('{col}', '{TileCol}')
+            # Hilangkan /default028mm/ jika ada agar fleksibel di semua TileMatrixSet
+            template_url = template_url.replace('/WMTS/1.0.0/default028mm/', '/WMTS/1.0.0/{TileMatrixSet}/')
+        else:
+            release_num = details.get('releaseNum', release_key)
+            template_url = f'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/{{TileMatrixSet}}/MapServer/tile/{release_num}/{{TileMatrix}}/{{TileRow}}/{{TileCol}}'
 
         layer_el = etree.Element('{http://www.opengis.net/wmts/1.0.0}Layer')
 
@@ -78,12 +89,12 @@ if contents is not None:
         res_url = etree.Element('{http://www.opengis.net/wmts/1.0.0}ResourceURL', {
             'format': 'image/jpeg',
             'resourceType': 'tile',
-            'template': f'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/{{TileMatrixSet}}/MapServer/tile/{release_id}/{{TileMatrix}}/{{TileRow}}/{{TileCol}}'
+            'template': template_url
         })
         layer_el.append(res_url)
         contents.append(layer_el)
 
-# Simpan XML dengan format yang rapi dan tanpa prefiks ns0
+# Simpan XML
 tree = etree.ElementTree(root)
 tree.write('esri/WMTSCapabilities.xml', encoding='utf-8', xml_declaration=True, pretty_print=True)
-print("File esri/WMTSCapabilities.xml berhasil diperbarui tanpa masalah namespace.")
+print("File esri/WMTSCapabilities.xml berhasil diperbarui dengan URL tile presisi.")
