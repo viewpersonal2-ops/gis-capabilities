@@ -2,14 +2,19 @@ import json
 import urllib.request
 import xml.etree.ElementTree as ET
 
+# Header penyamaran agar tidak ditolak oleh server Esri (403 Forbidden)
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+
 print("Mengambil data waybackconfig.json terbaru...")
 json_url = "https://s3-us-west-2.amazonaws.com/config.maptiles.arcgis.com/waybackconfig.json"
-with urllib.request.urlopen(json_url) as response:
+req_json = urllib.request.Request(json_url, headers=headers)
+with urllib.request.urlopen(req_json) as response:
     config_data = json.loads(response.read().decode('utf-8'))
 
 print("Mengambil template WMTSCapabilities.xml resmi dari Esri...")
 capabilities_url = "https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/WMTS/1.0.0/WMTSCapabilities.xml"
-with urllib.request.urlopen(capabilities_url) as response:
+req_cap = urllib.request.Request(capabilities_url, headers=headers)
+with urllib.request.urlopen(req_cap) as response:
     xml_content = response.read()
 
 ET.register_namespace('', 'http://www.opengis.net/wmts/1.0.0')
